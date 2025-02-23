@@ -13,7 +13,7 @@ CODE_FENCE_LOOKUP = {
     ".css": "css",
     ".sh": "bash",
     ".java": "java",
-    ".cpp": "c++",
+    ".cpp": "cpp",
     ".c": "c",
     ".json": "json",
     ".yml": "yaml",
@@ -23,27 +23,27 @@ CODE_FENCE_LOOKUP = {
     ".rs": "rust",
     ".go": "go",
     ".md": "md",
+    ".txt": "",  # Plain text
+    ".ini": "ini",
+    ".cfg": "cfg",
+    # Add more as needed
 }
 
 def handle_error(error_message):
-    """
-    Prints an error message and exits the program.
+    """Prints an error message and exits the program.
 
     Args:
         error_message (str): The error message to display.
-
-    Returns:
-        None
     """
     print(f"Error: {error_message}")
-    exit(1) 
+    exit(1)
 
 def is_text_file(file_path):
     """
     Checks if a file is likely a text file based on its content.
 
     This function attempts to read the first few bytes of the file and checks
-    for the presence of null bytes or control characters, which are typically 
+    for the presence of null bytes or control characters, which are typically
     found in binary files. It also excludes files with certain extensions that
     are known to be binary.
 
@@ -53,13 +53,15 @@ def is_text_file(file_path):
     Returns:
         bool: True if it's likely a text file, False otherwise.
     """
+
     # Exclude files based on known binary extensions
     binary_extensions = {
         '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff',  # Images
         '.mp3', '.wav', '.ogg', '.flac',  # Audio
         '.mp4', '.avi', '.mov', '.mkv',  # Video
         '.zip', '.rar', '.7z', '.tar', '.gz',  # Archives
-        '.exe', '.dll', '.so', '.o', '.pyc', # Executables and object files
+        '.exe', '.dll', '.so', '.o', '.pyc',  # Executables and object files
+        '.class', '.jar',  # Java class and jar files
         # Add more as needed
     }
     _, ext = os.path.splitext(file_path)
@@ -70,24 +72,20 @@ def is_text_file(file_path):
     try:
         with open(file_path, 'rb') as f:
             chunk = f.read(1024)  # Read a small portion of the file
-            if b'\x00' in chunk or any(c < 32 for c in chunk if c != 9 and c != 10 and c != 13):
+            if b'\x00' in chunk or any(c < 32 for c in chunk if c not in (9, 10, 13)):
                 return False  # Likely binary
             else:
                 return True  # Likely text
-    except Exception:  # Handle potential errors (e.g., file not found)
+    except Exception:
         return False
 
 def write_file_to_output(file_path, base_folder, output_file):
-    """
-    Writes the content of a file to the output file with markdown code fences.
+    """Writes the content of a file to the output file with markdown code fences.
 
     Args:
         file_path (str): Path to the file.
         base_folder (str): Base folder for relative path calculation.
         output_file (file object): Output file object.
-
-    Returns:
-        None
     """
     # Calculate the relative path including the base_folder name
     rel_path = os.path.relpath(file_path, base_folder)
@@ -97,14 +95,12 @@ def write_file_to_output(file_path, base_folder, output_file):
     else:
         rel_path = os.path.normpath(rel_path)
     _, ext = os.path.splitext(file_path)
-    language = CODE_FENCE_LOOKUP.get(ext, "")
+    language = CODE_FENCE_LOOKUP.get(ext.lower(), "")
 
     # Attempt to read the file with different encodings
     encodings_to_try = ['utf-8', 'ascii', 'latin-1']
     content = None
     for encoding in encodings_to_try:
-        if encoding is None:
-            continue
         try:
             with open(file_path, 'r', encoding=encoding) as f:
                 content = f.read()
@@ -115,11 +111,11 @@ def write_file_to_output(file_path, base_folder, output_file):
     if content is None:
         handle_error(f"Unable to read {file_path} with any of the attempted encodings.")
 
-    output_file.write(f"\n### **`{rel_path}`**\n\n`{language}\n{content}\n`\n")
+    # Use triple backticks and include language
+    output_file.write(f"\n### **`{rel_path}`**\n\n```{language}\n{content}\n```\n")
 
 def should_include(name, includes):
-    """
-    Checks if a name should be included based on the provided include patterns.
+    """Checks if a name should be included based on the provided include patterns.
 
     Args:
         name (str): Name to check (basename of file or directory).
@@ -136,8 +132,7 @@ def should_include(name, includes):
     return False
 
 def should_exclude(name, exclusions):
-    """
-    Checks if a name should be excluded based on the provided exclusion patterns.
+    """Checks if a name should be excluded based on the provided exclusion patterns.
 
     Args:
         name (str): Name to check (basename of file or directory).
@@ -152,8 +147,7 @@ def should_exclude(name, exclusions):
     return False
 
 def traverse_and_concatenate(current_path, base_folder, output_file, exclusions, includes, processed_files, included_explicitly=False):
-    """
-    Recursively traverses directories and writes files to the output file.
+    """Recursively traverses directories and writes files to the output file.
 
     Args:
         current_path (str): Current directory or file to process.
@@ -163,9 +157,6 @@ def traverse_and_concatenate(current_path, base_folder, output_file, exclusions,
         includes (list): List of inclusion patterns.
         processed_files (list): List to store processed file paths.
         included_explicitly (bool): Whether the current directory was included explicitly.
-
-    Returns:
-        None
     """
     name = os.path.basename(current_path)
 
@@ -206,8 +197,7 @@ def traverse_and_concatenate(current_path, base_folder, output_file, exclusions,
             return
 
 def concatenate_files_and_folders(output_name, paths, force=False, exclusions=[], includes=[]):
-    """
-    Concatenates text files and folders into a single output file with markdown code fences.
+    """Concatenates text files and folders into a single output file with markdown code fences.
 
     Args:
         output_name (str): Name of the output file.
@@ -215,9 +205,6 @@ def concatenate_files_and_folders(output_name, paths, force=False, exclusions=[]
         force (bool): Overwrite the output file if it exists.
         exclusions (list): List of exclusion patterns.
         includes (list): List of inclusion patterns.
-
-    Returns:
-        None
     """
     if os.path.exists(output_name) and not force:
         handle_error(f"Output file '{output_name}' already exists. Use -f or --force to overwrite.")
@@ -246,10 +233,15 @@ def concatenate_files_and_folders(output_name, paths, force=False, exclusions=[]
                 # Files specified on command line are included explicitly
                 if is_text_file(path):
                     # Adjust rel_path to include base folder name
+                    base_folder = os.path.dirname(path)
                     rel_path = os.path.basename(path)
-                    print(f"  Adding: {rel_path}")
+                    if base_folder:
+                        base_folder_name = os.path.basename(base_folder.rstrip(os.sep))
+                        if base_folder_name:
+                            rel_path = os.path.join(base_folder_name, rel_path)
+                    print(f"  Adding file: {rel_path}")
                     processed_files.append(path)
-                    write_file_to_output(path, os.path.dirname(path), output_file)
+                    write_file_to_output(path, base_folder, output_file)
                 else:
                     skipped_files.append(path)
             elif os.path.isdir(path):
@@ -268,8 +260,7 @@ def concatenate_files_and_folders(output_name, paths, force=False, exclusions=[]
         print(f"  Excluded paths: {len(excluded_paths)}")
 
 def find_overlap(s1, s2):
-    """
-    Finds the length of the overlapping suffix of s1 and prefix of s2.
+    """Finds the length of the overlapping suffix of s1 and prefix of s2.
 
     Args:
         s1 (str): First string.
@@ -284,15 +275,11 @@ def find_overlap(s1, s2):
     return 0
 
 def slice_files(input_files, output_folder):
-    """
-    Slices a concatenated file back into individual files and folders.
+    """Slices a concatenated file back into individual files and folders.
 
     Args:
         input_files (list): List of input files to slice.
         output_folder (str): Path to the output folder.
-
-    Returns:
-        None
     """
     print(f"Slicing files: {', '.join(input_files)}")
     print(f"Output folder: {output_folder}")
@@ -301,77 +288,55 @@ def slice_files(input_files, output_folder):
         os.makedirs(output_folder)
         print(f"Created output folder: {output_folder}")
 
-    matches = []
+
+    def normalize_header(header_line):
+        # If it's already markdown formatted, leave it alone.
+        if re.match(r'^###\s*\*\*`([^`]+)`\*\*', header_line):
+            return header_line
+        # Otherwise, check for a plain file path (must contain at least one slash).
+        m = re.match(r'^###\s*([^\n]+\/[^\n]+)', header_line)
+        if m:
+            path = m.group(1).strip()
+            # Wrap it in markdown formatting.
+            return f"### **`{path}`**"
+        return header_line
+
+    def normalize_content(content):
+        normalized_lines = []
+        for line in content.splitlines():
+            if line.startswith("###"):
+                normalized_lines.append(normalize_header(line))
+            else:
+                normalized_lines.append(line)
+        return "\n".join(normalized_lines)
+
+    
+
     # Regular expression to match file sections in the concatenated file
-    pattern = r'^\s*###\s*\*\*`([^`]+)`\*\*\s*$\n\n`(\w*)\n([\s\S]*?)(?:`|\Z)'
+    pattern = r'^\s*###\s*\*\*`([^`]+)`\*\*\s*$\n+```(?:\w*)\n([\s\S]*?)\n```'
 
     for input_file in input_files:
         with open(input_file, 'r', encoding='utf-8') as f:
             content = f.read()
-        match_list = list(re.finditer(pattern, content, re.MULTILINE))
-        matches.extend(match_list)
+        
+        normalized = normalize_content(content)
+        
+        matches = re.finditer(pattern, normalized, re.MULTILINE)
 
-    # Group matches by base filename (handling numbered parts)
-    file_groups = {}
-    for match in matches:
-        file_path = match.group(1).strip()
-        parts = file_path.rsplit('.', 1)
-        if len(parts) > 1 and parts[1].isdigit():
-            base_path = parts[0]
-            part_number = int(parts[1])
-        else:
-            base_path = file_path
-            part_number = 0  # Use 0 for unnumbered files
-
-        if base_path not in file_groups:
-            file_groups[base_path] = []
-        file_groups[base_path].append((part_number, match))
-
-    # Process each group of files, combining numbered parts and handling overlaps
-    processed_contents = {}
-    for base_path, group in file_groups.items():
-        sorted_group = sorted(group, key=lambda x: x[0])
-        current_content = ""
-
-        for i, (part_number, match) in enumerate(sorted_group):
-            file_content = match.group(3)
-
-            if i == 0:  # First part (base or .1)
-                current_content = file_content
-            else:
-                overlap = find_overlap(current_content, file_content)
-                if overlap > 0:
-                    current_content += file_content[overlap:]
-                else:
-                    current_content += file_content
-
-        # Store the final combined content
-        processed_contents[base_path] = current_content
-
-    # Write the processed contents to files, creating directories if needed
-    for file_path, content in processed_contents.items():
-        full_output_path = os.path.join(output_folder, file_path)
-        os.makedirs(os.path.dirname(full_output_path), exist_ok=True)
-        display_path = os.path.normpath(full_output_path)  # Normalize for better display
-        print(f"  Creating file: {display_path}")
-        with open(full_output_path, 'w', encoding='utf-8') as output_file:
-            output_file.write(content)
+        for match in matches:
+            rel_path = match.group(1).strip()
+            file_content = match.group(2)
+            full_output_path = os.path.join(output_folder, rel_path)
+            os.makedirs(os.path.dirname(full_output_path), exist_ok=True)
+            display_path = os.path.normpath(full_output_path)
+            print(f"  Creating file: {display_path}")
+            with open(full_output_path, 'w', encoding='utf-8') as output_file:
+                output_file.write(file_content)
 
     print("Slicing complete.")
 
 def main():
-    """
-    Main function to handle command-line arguments and execute concatenation or slicing.
-
-    This function parses command-line arguments, checks for duplicate names between files and folders,
-    and executes either the concatenation or slicing operation based on the provided arguments.
-
-    Args:
-        None
-
-    Returns:
-        None
-    """
+    """Main function to handle command-line arguments and execute concatenation or slicing."""
     parser = argparse.ArgumentParser(
         description="Concatenate or slice text files from files and folders into or from a single output with markdown code fences."
     )
