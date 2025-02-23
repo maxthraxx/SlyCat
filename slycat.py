@@ -13,7 +13,7 @@ CODE_FENCE_LOOKUP = {
     ".css": "css",
     ".sh": "bash",
     ".java": "java",
-    ".cpp": "cpp",
+    ".cpp": "c++",
     ".c": "c",
     ".json": "json",
     ".yml": "yaml",
